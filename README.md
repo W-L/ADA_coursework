@@ -1,4 +1,4 @@
-#applied_data_analysis_notebook
+# applied_data_analysis_notebook
 
 *Lukas Weilguny (01345185)*
 
