@@ -1,0 +1,236 @@
+---
+title: "Genes and pathways driving the maturation of *S. mansoni* after mating"
+subtitle: "UE Applied data analysis - supervised by Dr. Bob Zimmermann"
+author: "Lukas Weilguny (01345185)"
+date: "2 August 2018"
+
+output:
+  pdf_document:
+    fig_caption: yes
+    number_sections: yes
+
+bibliography: ada.bib
+csl: lw.csl
+urlcolor: black
+linkcolor: black
+fontsize: 12pt
+geometry: top=3cm, bottom=3cm, left=3cm, right=3cm
+header-includes:
+- \usepackage{setspace}
+- \usepackage{booktabs}
+- \usepackage{float}
+- \usepackage{rotating}
+- \usepackage[maxbibnames=99]{biblatex}
+- \usepackage{fancyhdr}
+- \pagestyle{fancy}
+- \fancyhf{}
+- \chead{\footnotesize{\today}}
+- \lhead{\footnotesize{Applied data analysis - \textit{S. mansoni}}}
+- \rhead{\footnotesize{Lukas Weilguny - \emph{01345185}}}
+- \cfoot{\thepage}
+
+- \onehalfspacing
+---
+
+```{r, echo=FALSE}
+def.chunk.hook  <- knitr::knit_hooks$get("chunk")
+knitr::knit_hooks$set(chunk = function(x, options) {
+  x <- def.chunk.hook(x, options)
+  ifelse(options$size != "normalsize", paste0("\\", options$size,"\n\n", x, "\n\n \\normalsize"), x)
+})
+```
+
+
+```{r, echo=FALSE, message=FALSE}
+knitr::opts_chunk$set(size="footnotesize", fig.pos = 'H')
+```
+
+\thispagestyle{empty}
+
+
+\tableofcontents
+\thispagestyle{empty}
+
+\newpage
+\pagenumbering{arabic}
+
+
+# Introduction
+
+
+Schistosomes are trematodes of the genus *Schistosoma* that mature as parasites in veins of mammals and cause severe inflammation [@king]. This is called Schistosomiasis and is the second most severe parasitic disease after malaria [@lu16], transmitted as water-borne infectious disease after its larval stage in an intermediate snail host. Since eggs produced by adult worms after mating are the causative agent, understanding egg formation and maturation by mating, enabling the production of the pathogenic eggs, is very important. After migration of the immature worms to the portal vein of the final vertebrate host, they develop into adults with separate sexes. Thus, dioecy is a defining characteristic of *Schistosoma* within the phylum *Platyhelminthes*, which is otherwise composed of hermaphrodites [@lu16]. The mating pairs, which stay permanently physically coupled, then migrate to their final location, the mesenteric veins of the gut and subsequently egg production is initiated. Around one half of the eggs are shed into the gut lumen, whereas the other half are carried into the liver or spleen via the blood system, where they penetrate tissues to cause severe inflammation and liver cirrhosis [@lu16]. 
+
+Only one drug exists to treat this disease and resistance might be emerging, therefore new targets for drug development are needed. 
+First insights into development and differentiation of the female gonad have been obtained after sequencing the genome of *S. mansoni*, nevertheless the processes involved are still poorly understood. @lu16 thus performed tissue-specific RNA-seq analysis to identify molecules and mechanisms driving sexual maturation. To achieve that, they sequenced ovaries and testes of *S. mansoni* females and males from single-sex infections, resulting in undeveloped worms or bisex (mixed sex) infections, ensuing full sexual development of adult worms.
+
+The work of @lu16 is largely focused on identifying processes in the gonads and uses whole-worm samples as control. Instead, this project aims to reanalyze the data [@data], specifically samples of whole worms, in order to detect the difference in transcriptome profiles of immature and mature adult worms and identify specific differentially expressed genes that drive the development of separate sexes. Additionally, by performing enrichment analysis we highlight cellular and metabolic processes that are active or disrupted upon maturation. 
+
+
+# Material and Methods
+
+## Data source and pre-processing
+
+The RNA-seq data used in this study is described in @data, and deposited in the European Nucleotide Archive with the study accession number PRJEB14695. Full records on schistosome maintenance, worm isolation, nucleic acid extraction and RNA sequencing can be found in @lu16. 100 ng of total RNA was used for library preparation in each sample with TruSeq RNA Library Preparation Kit. Sequencing was then performed in a multiplexed arrangement with unique Tags, resulting in 100 bp paired-end reads on an Illumina HiSeq 2500. The amount of reads corresponds to about 100x coverage of the S. mansoni transcriptome, which has an approximate size of 16 Mb. 
+
+The subset of sequenced specimens used for our investigation consists of 12 samples from whole adult worms, where 6 samples (3 male and 3 female) were obtained after single-sex infection of the final host and another 6 samples were collected from mixed-sex infected final hosts. The data was downloaded with the enaDataGet program from enaBrowserTools (v1.5.2) specifying the fastq format and default parameters otherwise. Further, individual files corresponding to one multiplexed sample were merged with standard Unix commands. 
+
+As a deviation from standard RNA-seq analysis reads were not trimmed, however a local alignment tool was chosen such that technical sequences would get soft clipped during mapping. The genome of *S. mansoni* and the associated transcriptome were obtained from EnsemblMetazoa in its assembly version ASM23792v2 [@smansoni_genome]. The genome has an approximate size of 270 Mb with seven autosomes and two sex chromosomes (females: ZW, males: ZZ). The transcriptome was converted from GFF3 format to GTF with `gffread` included in cufflinks (@cufflinks, v2.2.1) using default settings.
+
+## Read mapping and assignment
+
+For mapping reads to the genome the STAR RNA-seq aligner (@star, v2.5.3a) was employed. Thus, a genome index was created prior to mapping with default parameters apart from `genomeSAindexNbases`, which was set to 6 in order to reduces the length of the suffix array pre-indexing string for small genomes. Mapping was subsequently performed with predefined settings and standard parameters used in RNA-seq pipelines of the ENCODE project, which are listed in the manual of STAR [@star_man]. Afterwards, reads were assigned to genes with featureCounts (@featurecounts, v1.6.2). Settings were changed to count fragments defined by paired-mates (`-p`) and to incorporate fractionally weighted multi-mapped reads (`-M --fraction`).
+
+## Differential gene expression analysis
+
+SARtools (@sartools, v1.6.3) was applied for differential gene expression analysis, specifically utilizing DESeq2 [@deseq2]. The function `loadCountData` had to be modified to round fractional counts from multi-mapped reads. Additionally, the significance threshold was set to $alpha = 0.01$, after Benjamini-Hochberg adjustment. 
+
+
+## Functional annotation
+
+Functional annotation was performed using emapper-0.99 [@egg_program], with protein alignments produced by DIAMOND [@diamond]. Sequence searches were based on eggNOG orthologous groups [@egg_data], with default parameters, automatically adjusted taxonomic scope and targeting all orthologs in their database. DIAMOND was run in blastp-mode with the `--more_sensitive` flag, and stringent settings including an e-value cut-off of 0.001 and `--top` set to 3, meaning that only alignments within 3% of the top alignment score for each query are reported.
+
+## GO term enrichment analysis
+
+Following differential gene expression analysis, a list of genes was selected according to the criterion of membership in the union of DEGs from the comparisons ms versus mm and fs versus fm, but not in the intersection of this set with DEGs from the comparison of ms versus fs. For a graphical representation please see the results section. This way, genes that were differentially regulated during male or female maturation, independent of general gender specific effects, were selected. This set was subsequently analyzed for enriched GO terms found by functional annotation using topGO [@topgo], with the classicCount algorithm and Fisher's Exact test as well as the GO hierarchy of the GO.db package. Visualizations were produced with GOplot [@goplot].
+
+
+# Results 
+
+## Read statistics and diagnostics
+
+The present study examines differentially expressed features between samples of two conditions and two sexes of *S. mansoni*. An overview of the samples, their raw read counts, mapping statistics and counted features is given in Table 1. The percentage of null counts for each sample are shown in Fig. 1, which are consistent between conditions and also within replicates. Notably 2808 features or 21.09 % have no counts across all samples, partly explicable by the transcriptome containing nuclear as well as mitochondrial rRNAs and tRNAs. Fig. 1B further shows the density of read counts, again the concordance between samples is high. However, the overall shape does not follow an expected Poisson distribution but instead shows a bias of features with rather high counts over genes with medium or low counts. This pattern was also observed by the authors of the published data [see Fig. 3, @data].
+
+
+
+\begin{table}[]
+\footnotesize
+\caption{The number of raw reads, uniquely and multi-mapped reads as well as the total sequences assigned to genes}
+\begin{center}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Sample & \multicolumn{1}{c}{raw reads} & \multicolumn{2}{c}{uniquely mapped (n, \%)} & \multicolumn{2}{c}{multi mapped (n, \%)} & \multicolumn{2}{c}{assigned reads (n, \%)} \\ \midrule
+fs1       & 31537628                      & 26545508                & 84.17             & 1504922               & 4.77             & 24805324                & 78.65            \\
+fs2       & 55985134                      & 45678263                & 81.59             & 2988914               & 5.34             & 43027141                & 76.85            \\
+fs3       & 40615071                      & 29850099                & 73.5              & 1598788               & 3.94             & 27839307                & 68.54            \\
+fm1       & 41259411                      & 33950282                & 82.28             & 2497677               & 6.05             & 30792553                & 74.63            \\
+fm2       & 28525293                      & 18180409                & 63.73             & 5781728               & 20.27            & 21276807                & 74.59            \\
+fm3       & 24373230                      & 15589983                & 63.96             & 5228620               & 21.45            & 18342923                & 75.26            \\
+mm1       & 21126517                      & 10405541                & 49.25             & 8386109               & 39.69            & 11971967                & 56.67            \\
+mm2       & 30864815                      & 24866495                & 80.57             & 1409732               & 4.57             & 22925174                & 74.28            \\
+mm3       & 29560640                      & 24514810                & 82.93             & 1506957               & 5.1              & 22818931                & 77.19            \\
+ms1       & 31844449                      & 26128211                & 82.05             & 1543312               & 4.85             & 24370884                & 76.53            \\
+ms2       & 32127433                      & 26027564                & 81.01             & 1514551               & 4.71             & 24267282                & 75.53            \\
+ms3       & 27276243                      & 22775186                & 83.5              & 1395874               & 5.12             & 20980196                & 76.92            \\
+\midrule
+Mean      & 32924655.33                   & 25376029.25             & 75.71             & 2946432               & 10.49            & 24451540.75             & 73.8             \\
+S.d.      & 9260198.36                    & 8982298.96              & 11.04             & 2292109.92            & 11.07            & 7489891.92              & 5.95             \\ \bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+
+
+![(A) The percentage of null counts is consistent across samples and replicates, yet a rather high percentage of features in the gene annotation has no counts in any of the samples (dashed line). (B) The density of read counts also shows consistency across all samples but does not follow an expected Poisson distribution. Instead a bias for high-count features over medium and low counts can be observed.](rep_figs/FIG1.png)
+
+
+
+
+## Assessing variability within and across samples
+
+Fig. 2A illustrates the percentage of counts that are assigned to the most abundant feature. Apart from the fm samples, all other conditions show values below 4% and thus absence of high count features. Strikingly, for all three female replicates of mixed-infection experiments a hypothetical, uncharacterized gene makes up 10-25% of all assigned reads, indicative of a low-complexity sample or some technical issue.
+
+![Variability of investigated samples. (A) For all replicates of condition *fm* 10-25% of mapped reads were assigned to a single feature; a hypothetical, uncharacterized gene. Whereas the most abundant feature of the remaining samples makes up less than 4% of reads. (B, C) Principal component analysis reveals good clustering of replicates and separates samples by their biological condition. (D) Hierarchical clustering additionally groups replicates into subclades and together with PCA hints at a higher similarity of immature female *S. mansoni* to their male counterparts. (E) A pairwise scatter plot shows feature counts between all pairwise combinations of samples. It confirms the quality of replicates for most conditions but also highlights the dissimilarity of some samples to their biological replicates (e.g. fm1).](rep_figs/FIG2.png)
+
+To further assess the similarity of replicates and whether the captured variation has biological reasons, the first three principal components are visualized (Fig. 2B and 2C). Generally the replicates within their conditions are clustered together. What is more, the first principal component separates the samples by biological condition with 81% of the total variance explained. This axis also shows that male *S. mansoni* prior to maturation (ms) do not seem to differ from their matured counterparts (mm) as much as females do after egg production has been initiated. Additionally, females before maturation (fs) appear to be more similar to male worms than they are to matured female *S. mansoni*. This is also clearly visible in Fig. 2D, where samples were hierarchically clustered using the euclidean distance after VST-transformation. Female worms of single-sex infection experiments cluster with both conditions of male samples in support of the results from PCA. Besides that, replicates of conditions group in subclades as expected for biological replicates. 
+
+Similar patterns of resemblance can be observed in a pairwise scatter plot (Fig. 2E). The upper triangle shows scatter plots of log\textsubscript{2}-transformed counts between samples and the lower triangle lists the SERE statistic, which behaves inversely proportional to the similarity between samples. Notably, most replicates exhibit good resemblance with the closest pair separated by a SERE value of 1.79 (ms1 and ms2). At the same time however, sample fs1 seems fairly dissimilar to its biological replicates (e.g. 22.86 to fs2). This could partly be explained by the apparent low complexity of the fm samples, as seen in Fig. 2A, and possibly the influence of that major feature on the dissimilarity. A general trend, which further emphasizes the patterns seen by PCA and clustering is that mature females are the least similar to all other samples, whereas immature females are more similar to males irrespective of their developmental stage (see upper right corner and lower left corner of Fig. 2E).
+
+## Normalization and dispersion estimation 
+
+To make read counts comparable across samples, normalization was performed with the DESeq2 method [@deseq2]. Boxplots in Fig. 3A and 3B visualize the distribution of reads per sample prior to and after normalization, respectively. The normalized distributions in Fig. 3B are clearly stabilized across all conditions and replicates. Another step in modelling differential gene expression in DEseq2 involves the estimation of dispersion of the data. The relationship of the mean normalized counts and the associated variance fitted as a model to the empirical data can be seen in Fig. 3C. Additionally, a graphical check for the assumption of log-normality of the dispersion values is shown in Fig. 3D, which shows a slight shift of the main peak towards lower negative values and a second, albeit smaller peak at positive values.
+
+
+![(A, B) Normalization with DESeq2 stabilizes the distribution of raw counts, in order to perform differential gene expression analysis across conditions. (C) The dispersion estimates as a relationship of mean normalized counts and variance as used in the DESeq2 modelling process. (D) The assumption of log-normality of estimated dispersion values is not fulfilled unconditionally.](rep_figs/FIG3.png)
+
+## Differentially expressed genes
+
+The absolute number of differentially expressed genes (DEGs) is presented in Table 2. As expected from previous descriptive and diagnostic analyses, the comparisons involving mature female *S. mansoni* exhibit most DEGs (5235-5835) again confirming that these samples are the most dissimilar to all remaining ones. Whereas the undeveloped females fall in between with around 3000 DEGs, the least differential features were detected for immature versus mature males (661 in total). A graphical representation of the DEGs is given in Fig. 4A, which sets the numbers in relation to the overall number of features. Further, Fig. 4B shows the number of DEGs in each comparison on the bottom left and the size of all possible intersections on the top. It demonstrates that the largest intersection is obtained from the three largest sets, combining gender specific differences after maturation of the female and the process of female development itself. Moreover, we can see that the most private DEGs (276) are observed for the comparison of mm versus fm, both genders after maturation. These might include genes that are responsible for sex-specific functions after maturation, such as egg and sperm production, as opposed to the general, sex-independent process of maturation. Genes that are significantly differentially expressed across all conditions are rare with only 73 detected features.
+
+
+\begin{table}[]
+\caption{Summary of the number of differentially expressed genes between all tested conditions}
+\begin{center}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Conditions & Down-regulated & Up-regulated & Total DEGs \\ \midrule
+fm vs fs   & 2616           & 2619         & 5235       \\
+mm vs fs   & 1613           & 1721         & 3334       \\
+ms vs fs   & 1247           & 1412         & 2659       \\
+mm vs fm   & 2820           & 3015         & 5835       \\
+ms vs fm   & 2755           & 2941         & 5696       \\
+ms vs mm   & 369            & 292          & 661        \\ \bottomrule
+\end{tabular}
+\end{center}
+\end{table}
+
+![Differential gene expression analysis. (A) A treemap shows the proportion of up- and down- regulated as well as non-differentially expressed genes for each comparison. (B) The size of the intersections between comparisons of all conditions. (C) MA-plots show log2-fold changes as a function of normalized counts. Features are represented as dots and colored red to illustrate significance.](rep_figs/FIG4.png)
+
+
+In contrast to the overview provided in the first two panels, Fig. 4C shows the results of each comparison in greater detail. These plots present the log2-fold change as a function of normalized counts for each investigated feature, colored red in case of significance. Taken together, these results confirm that maturation has a much smaller impact on the transcriptional state of male worms than it has on females. Actually, the development of the female is characterized by a shift in gene regulation that is almost of the same intensity as the difference between the genders, and notably it encompasses many of the same genes as visible in the largest intersection of Fig. 4B.
+
+
+
+
+## Selecting a subset of relevant genes
+
+In order to further the understanding of the transition between hermaphroditic and dioecious reproductive states, @transition investigated how simultaneous hermaphrodites, specify and maintain gender. They identified a male-specific gene (*dmd-1*) coding for Doublesex-and mab3-related transcription factor in *Schmidtea mediterranea*, and a homolog in *S. mansoni*, which acts as a major driver of sex transition and male germ cell development as one means by which modulation of sex-specific pathways can cause transition from hermaphrodites to dioecy. These new findings together with the possibility of evolution of dioecy through androdioecy, as proposed by @evo_dio, point at an interesting subset of genes for further investigation. More specifically, since our data suggest an evolutionary history of protandry as a form of sequential hermaphroditism in the ancestor by showing that female virgins are more similar to males (Fig. 2) and that the transition of maturity is much more pronounced for females (Fig. 4) we propose in depth analysis of the subset of genes depicted in Fig. 5. These genes follow the same pattern as the homolog to *Smed_dmd-1*, reported in @transition, as they are differentially regulated in males or in females but not in a comparison of undeveloped females versus males, in order to exclude other general gender differences not directly involved in the developmental process. This list of genes was used in a GO term enrichment analysis using a custom functional annotation of the *S. mansoni* proteome. 
+
+
+
+![The genes selected for further analysis involve DEGs from the comparison of immature and mature worms of both sexes (union of red and blue) without DEGs from the comparison of immature males and females (intersection with green) ](rep_figs/FIG5.png){width=60%}
+
+
+## GO terms enriched in the developmental process of *S. mansoni*
+
+The bubble plot in Fig. 6 helps to get an overview of the enriched GO terms. A z-score is shown on the x-axis, which hints at either a down- or up- regulation of a GO term by considering the relative difference of down- and up- regulated genes associated with that GO term (see @goplot for details). Whereas on the y-axis, GO terms are plotted according to their negative logarithmic p-values. Generally we observe a shift of z-scores to positive values, indicating that more pathways or functions are being up- rather than down-regulated during the maturation process. Notably, significantly enriched GO terms involve many categories associated with development and growth as well as increased protein and membrane production and glycosylation (Fig. 6, right), corresponding very well to the maturation process that is initiated after mating. An additional visualization is provided in Fig. 7, which shows the top 5 terms of Fig. 6 within the network of the GO hierarchy. This illustrates how the significant GO terms are distributed over the GO graph includes all subgraphs induced by these terms with lowest p-value. 
+
+
+![An overview of the GO enrichment analysis is gained by a bubble plot [@goplot], where terms are arranged by their z-score and p-value. The area of each circle is proportional to the number of genes assigned to the respective GO term and colors indicate the category of the term. A significance threshold is drawn for alpha = 0.05. Circles with a negative logarithmic p-value greater than 3 are labelled by their GO-Ids and shown in the table to the right.](rep_figs/FIG6.png)
+
+
+
+![The five terms with lowest p-value in Fig. 6 are depicted within their GO hierarchy as rectangles. Each GO term is colored on a gradient according to its p-value.](rep_figs/FIG7.png)
+
+
+
+
+\newpage
+
+# Discussion and conclusion
+
+
+
+In this work we reanalyzed a dataset published by [@lu16] on the transcriptomic profiles of immature and fully developed, adult *S. mansoni*. RNA-seq data was processed and analyzed according to standard pipelines to assess variability and similarity between different conditions and specifically to detect differentially expressed genes. We successfully show that the samples capture true biological variation and replicates share a reasonable degree of similarity and complexity. One possible case of low complexity was observed in female samples of mixed-infection experiments. In particular, one hypothetical, uncharacterized gene makes up 10-25% of all assigned reads, indicative of low-complexity or a technical issue. However, fitting for the condition of mixed-infection, a Blast search with the translated protein sequence produced a hit to the eggshell protein gene region of *S. haematobium*, a sister species to *S. mansoni*. Thus, the extraordinary high expression of that gene could be related to the massive daily production of up to 3000 eggs per mature female [@lu16].
+
+Another notable result is the similarity of undeveloped females to male worms, which was already noticed by @lu16. We can confirm their findings by PCA, hierarchical clustering and by pair-wise scatterplots, demonstrating that the transcriptional profile of immature females resembles the profile of male worms more closely than of adult females. A possible explanation for this striking outcome is the evolutionary context of the schistosome gender. In hermaphroditic worms of the phylum *Platyhelminthes*, including cestodes and trematodes amongst others, protandry is a common form of sequential development, in which the female gonads form after the male reproductive organs. By contrast, in schistosomes dioecy is thought to have evolved for partition of labor in reproduction and egg production [@evo_dio]. This occurs for example by genes suppressing female-specific functions in males and thus prohibiting further maturation of female gonads [@transition]. Together with the permanent contact after pairing, reminiscent of a protandric ancestor, this hints at *S. mansoni* inhabiting a transitional state towards fully established dioecy. Additional evidence stems from the detection of leaky transcription of genes specifically for egg production in male worms [@transition].
+
+With regard to potential evolutionary novelties for the origin of dioecy, we investigated a set of differentially expressed genes between undeveloped and adult stages, while excluding gender specific functions decoupled of the developmental process. The significantly enriched GO terms of this subset of genes includes developmental processes, anatomical structure development, integral components of the membrane and additional categories generally associated with growth. Taken together, we propose this subset of candidate genes for further investigation of the maturation process and its evolutionary history in the context of the origin of dioecy. Follow-up studies might assess orthology relationships of these genes in a wider context, covering the different mating or gender systems at the base of bilaterian animals. Moreover, knock-out experiments targeting developmental pathways involving such genes might help to identify potential targets for prevention of maturation during schistosome infection.
+
+
+
+\newpage
+
+<!-- # Appendix -->
+<!-- \listoffigures -->
+<!-- \listoftables -->
+
+
+
+# References
+
+\setlength{\parindent}{-0.2in}
+\setlength{\leftskip}{0.2in}
+\setlength{\parskip}{8pt}
+\noindent
+
+
